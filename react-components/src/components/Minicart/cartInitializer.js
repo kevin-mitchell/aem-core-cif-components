@@ -13,119 +13,82 @@
  ******************************************************************************/
 import { useEffect } from 'react';
 import { useCartState } from './cartContext';
-import { useCookieValue } from '../../utils/hooks';
+import { useCookieValue, useAwaitQuery } from '../../utils/hooks';
 import { useMutation } from '@apollo/react-hooks';
-import parseError from '../../utils/parseError';
+import { useUserContext } from '../../context/UserContext';
 
-import MUTATION_CREATE_CART from '../../queries/mutation_create_guest_cart.graphql';
-import CART_DETAILS_QUERY from '../../queries/query_cart_details.graphql';
+import { removeItemFromCart, addCoupon, removeCoupon } from '../../actions/cart';
+
 import MUTATION_REMOVE_ITEM from '../../queries/mutation_remove_item.graphql';
-import MUTATION_ADD_TO_CART from '../../queries/mutation_add_to_cart.graphql';
 import MUTATION_ADD_COUPON from '../../queries/mutation_add_coupon.graphql';
 import MUTATION_REMOVE_COUPON from '../../queries/mutation_remove_coupon.graphql';
+import CART_DETAILS_QUERY from '../../queries/query_cart_details.graphql';
 
 const CartInitializer = props => {
     const [{ cartId: stateCartId }, dispatch] = useCartState();
+    const [{ cartId: registeredCartId }] = useUserContext();
+
     const CART_COOKIE = 'cif.cart';
 
     const [cartId, setCartCookie] = useCookieValue(CART_COOKIE);
-    const [createCart, { data, error }] = useMutation(MUTATION_CREATE_CART);
-    const [addItem] = useMutation(MUTATION_ADD_TO_CART);
-    const [removeItem] = useMutation(MUTATION_REMOVE_ITEM);
-    const [addCoupon] = useMutation(MUTATION_ADD_COUPON);
-    const [removeCoupon] = useMutation(MUTATION_REMOVE_COUPON);
+
+    const [removeItemMutation] = useMutation(MUTATION_REMOVE_ITEM);
+    const [addCouponMutation] = useMutation(MUTATION_ADD_COUPON);
+    const [removeCouponMutation] = useMutation(MUTATION_REMOVE_COUPON);
+    const cartDetailsQuery = useAwaitQuery(CART_DETAILS_QUERY);
 
     const createCartHandlers = (cartId, dispatch) => {
         return {
-            addItem: ev => {
-                if (!ev.detail) return;
+            removeItem: async itemId => {
+                dispatch({ type: 'beginLoading' });
+                await removeItemFromCart({ cartId, itemId, dispatch, cartDetailsQuery, removeItemMutation });
+                dispatch({ type: 'endLoading' });
+            },
+            addCoupon: async couponCode => {
+                dispatch({ type: 'beginLoading' });
+                await addCoupon({
+                    cartId,
+                    couponCode,
+                    cartDetailsQuery,
+                    addCouponMutation,
+                    dispatch
+                });
 
-                const { sku, quantity } = ev.detail;
-                dispatch({ type: 'open' });
-                dispatch({ type: 'beginLoading' });
-                return addItem({
-                    variables: { cartId, sku, quantity },
-                    refetchQueries: [{ query: CART_DETAILS_QUERY, variables: { cartId } }],
-                    awaitRefetchQueries: true
-                })
-                    .catch(error => {
-                        dispatch({ type: 'error', error: error.toString() });
-                    })
-                    .finally(() => {
-                        dispatch({ type: 'endLoading' });
-                    });
+                dispatch({ type: 'endLoading' });
             },
-            removeItem: itemId => {
+            removeCoupon: async () => {
                 dispatch({ type: 'beginLoading' });
-                return removeItem({
-                    variables: { cartId, itemId },
-                    refetchQueries: [{ query: CART_DETAILS_QUERY, variables: { cartId } }],
-                    awaitRefetchQueries: true
-                })
-                    .catch(error => {
-                        dispatch({ type: 'error', error: error.toString() });
-                    })
-                    .finally(() => {
-                        dispatch({ type: 'endLoading' });
-                    });
-            },
-            addCoupon: couponCode => {
-                dispatch({ type: 'beginLoading' });
-                return addCoupon({
-                    variables: { cartId, couponCode },
-                    refetchQueries: [{ query: CART_DETAILS_QUERY, variables: { cartId } }],
-                    awaitRefetchQueries: true
-                })
-                    .catch(error => {
-                        dispatch({ type: 'couponError', error: parseError(error) });
-                    })
-                    .finally(() => {
-                        dispatch({ type: 'endLoading' });
-                    });
-            },
-            removeCoupon: () => {
-                dispatch({ type: 'beginLoading' });
-                return removeCoupon({
-                    variables: { cartId },
-                    refetchQueries: [{ query: CART_DETAILS_QUERY, variables: { cartId } }],
-                    awaitRefetchQueries: true
-                })
-                    .catch(error => {
-                        dispatch({ type: 'error', error: error.toString() });
-                    })
-                    .finally(() => {
-                        dispatch({ type: 'endLoading' });
-                    });
+                await removeCoupon({ cartId, removeCouponMutation, cartDetailsQuery, dispatch });
+                dispatch({ type: 'endLoading' });
             }
         };
     };
 
     useEffect(() => {
-        if (!cartId || cartId.length === 0) {
-            createCart();
+        if (cartId && cartId.length > 0 && !stateCartId) {
+            console.log(`Put the cart id ${cartId} in the state.`);
+            dispatch({ type: 'cartId', cartId, methods: createCartHandlers(cartId, dispatch) });
         }
     }, [cartId]);
 
     useEffect(() => {
-        if (cartId && (!stateCartId || stateCartId.length === 0)) {
-            dispatch({ type: 'cartId', cartId: cartId, methods: createCartHandlers(cartId, dispatch) });
+        if (stateCartId && (!cartId || cartId.length === 0)) {
+            console.log(`Put the cart id in the cookie`);
+            setCartCookie(stateCartId);
         }
-    }, [cartId, stateCartId]);
+    }, [stateCartId]);
 
     useEffect(() => {
-        if (data) {
-            setCartCookie(data.createEmptyCart);
+        if (registeredCartId) {
+            console.log(`Running the effect with the registered cart id ${registeredCartId}`);
+            setCartCookie(registeredCartId);
             dispatch({
                 type: 'cartId',
-                cartId: data.createEmptyCart,
-                methods: createCartHandlers(data.createEmptyCart, dispatch)
+                cartId: registeredCartId,
+                methods: createCartHandlers(registeredCartId, dispatch)
             });
         }
-
-        if (error) {
-            dispatch({ type: 'error', error: error.toString() });
-        }
-    }, [data, error]);
+    }, [registeredCartId]);
 
     return props.children;
 };

@@ -13,24 +13,33 @@
  ******************************************************************************/
 import React from 'react';
 import { LogOut as SignOutIcon, Lock as PasswordIcon } from 'react-feather';
+import { useTranslation } from 'react-i18next';
 
 import AccountLink from './accountLink';
 import LoadingIndicator from '../LoadingIndicator';
 
 import classes from './myAccount.css';
 import { useUserContext } from '../../context/UserContext';
-import { func } from 'prop-types';
+import { useCartState } from '../Minicart/cartContext';
 
-const SIGN_OUT = 'Sign Out';
+import { func } from 'prop-types';
 
 const MyAccount = props => {
     const { showMenu, showChangePassword } = props;
     const [{ currentUser, isSignedIn, inProgress }, { signOut }] = useUserContext();
+    const [, dispatch] = useCartState();
+
+    const [t] = useTranslation('account');
+
+    const handleSignOut = () => {
+        dispatch({ type: 'reset' });
+        signOut();
+    };
 
     if (inProgress) {
         return (
             <div className={classes.modal_active}>
-                <LoadingIndicator>{'Signing In'}</LoadingIndicator>
+                <LoadingIndicator>{t('account:signing-in', 'Signing In')}</LoadingIndicator>
             </div>
         );
     }
@@ -48,11 +57,11 @@ const MyAccount = props => {
             <div className={classes.actions}>
                 <AccountLink onClick={showChangePassword}>
                     <PasswordIcon size={18} />
-                    Change Password
+                    {t('account:change-password', 'Change Password')}
                 </AccountLink>
-                <AccountLink onClick={signOut}>
+                <AccountLink onClick={handleSignOut}>
                     <SignOutIcon size={18} />
-                    {SIGN_OUT}
+                    {t('account:sign-out', 'Sign Out')}
                 </AccountLink>
             </div>
         </div>

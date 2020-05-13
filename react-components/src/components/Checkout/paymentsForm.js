@@ -14,6 +14,7 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { Form } from 'informed';
 import { array, bool, shape, string, func } from 'prop-types';
+import { useTranslation } from 'react-i18next';
 
 import Button from '../Button';
 import Select from '../Select';
@@ -31,8 +32,9 @@ import combine from '../../utils/combineValidators';
  * the submission state as well as prepare/set initial values.
  */
 const PaymentsForm = props => {
-    const { initialPaymentMethod, initialValues, paymentMethods, cancel, countries, submit } = props;
+    const { initialPaymentMethod, initialValues, paymentMethods, cancel, countries, submit, allowSame } = props;
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [t] = useTranslation(['checkout', 'common']);
 
     const anchorRef = useRef(null);
 
@@ -47,13 +49,25 @@ const PaymentsForm = props => {
     const [paymentMethod] = useState(initialPaymentMethodState);
 
     let initialFormValues;
-    if (!initialValues || initialValues.sameAsShippingAddress) {
+    if (allowSame && (!initialValues || initialValues.sameAsShippingAddress)) {
         // If the addresses are the same, don't populate any fields
         // other than the checkbox with an initial value.
         initialFormValues = {
             addresses_same: true
         };
     } else {
+        // Convert street array
+        if (initialValues && initialValues.street) {
+            initialValues.street.forEach((v, i) => {
+                initialValues[`street${i}`] = v;
+            });
+        }
+
+        // Convert region code
+        if (initialValues && initialValues.region) {
+            initialValues.region_code = initialValues.region.code;
+        }
+
         // The addresses are not the same, populate the other fields.
         initialFormValues = {
             addresses_same: false,
@@ -77,7 +91,7 @@ const PaymentsForm = props => {
                     lastname: formValues['lastname'],
                     postcode: formValues['postcode'],
                     region_code: formValues['region_code'],
-                    street: formValues['street'],
+                    street: [formValues['street0']],
                     telephone: formValues['telephone']
                 };
             } else {
@@ -97,32 +111,32 @@ const PaymentsForm = props => {
     const billingAddressFields = differentAddress ? (
         <>
             <div className={classes.firstname}>
-                <Field label="First Name">
+                <Field label={t('checkout:address-firstname', 'First Name')}>
                     <TextInput id={classes.firstname} field="firstname" validate={isRequired} />
                 </Field>
             </div>
             <div className={classes.lastname}>
-                <Field label="Last Name">
+                <Field label={t('checkout:address-lastname', 'Last Name')}>
                     <TextInput id={classes.lastname} field="lastname" validate={isRequired} />
                 </Field>
             </div>
             <div className={classes.email}>
-                <Field label="Email">
+                <Field label={t('checkout:address-email', 'E-Mail')}>
                     <TextInput id={classes.email} field="email" validate={combine([isRequired, validateEmail])} />
                 </Field>
             </div>
             <div className={classes.street0}>
-                <Field label="Street">
-                    <TextInput id={classes.street0} field="street[0]" validate={isRequired} />
+                <Field label={t('checkout:address-street', 'Street')}>
+                    <TextInput id={classes.street0} field="street0" validate={isRequired} />
                 </Field>
             </div>
             <div className={classes.city}>
-                <Field label="City">
+                <Field label={t('checkout:address-city', 'City')}>
                     <TextInput id={classes.city} field="city" validate={isRequired} />
                 </Field>
             </div>
             <div className={classes.region_code}>
-                <Field label="State">
+                <Field label={t('checkout:address-state', 'State')}>
                     <TextInput
                         id={classes.region_code}
                         field="region_code"
@@ -131,12 +145,12 @@ const PaymentsForm = props => {
                 </Field>
             </div>
             <div className={classes.postcode}>
-                <Field label="ZIP">
+                <Field label={t('checkout:address-postcode', 'ZIP')}>
                     <TextInput id={classes.postcode} field="postcode" validate={isRequired} />
                 </Field>
             </div>
             <div className={classes.telephone}>
-                <Field label="Phone">
+                <Field label={t('checkout:address-phone', 'Phone')}>
                     <TextInput id={classes.telephone} field="telephone" validate={isRequired} />
                 </Field>
             </div>
@@ -166,20 +180,22 @@ const PaymentsForm = props => {
                 </div>
                 <PaymentProvider />
                 <div className={classes.address_check}>
-                    <Checkbox
-                        field="addresses_same"
-                        label="Billing address same as shipping address"
-                        onClick={ev => {
-                            setDifferentAddress(!ev.target.checked);
-                        }}
-                    />
+                    {allowSame && (
+                        <Checkbox
+                            field="addresses_same"
+                            label={t('checkout:same-as-shipping', 'Billing address same as shipping address')}
+                            onClick={ev => {
+                                setDifferentAddress(!ev.target.checked);
+                            }}
+                        />
+                    )}
                 </div>
                 {billingAddressFields}
             </div>
             <div className={classes.footer}>
-                <Button onClick={cancel}>Cancel</Button>
+                <Button onClick={cancel}>{t('common:cancel', 'Cancel')}</Button>
                 <Button priority="high" type="submit" disabled={isSubmitting}>
-                    Use Payment Method
+                    {t('checkout:use-payment-method', 'Use Payment Method')}
                 </Button>
             </div>
         </Form>
@@ -198,8 +214,9 @@ PaymentsForm.propTypes = {
         postcode: string,
         region_code: string,
         sameAsShippingAddress: bool,
-        street0: array
+        street0: string
     }),
+    allowSame: bool,
     cancel: func.isRequired,
     submit: func.isRequired,
     initialPaymentMethod: shape({
@@ -210,7 +227,8 @@ PaymentsForm.propTypes = {
 };
 
 PaymentsForm.defaultProps = {
-    initialValues: {}
+    initialValues: {},
+    allowSame: true
 };
 
 export default PaymentsForm;

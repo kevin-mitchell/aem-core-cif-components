@@ -2,6 +2,7 @@
   "pageA": {
     "jcr:primaryType": "cq:Page",
     "jcr:content": {
+      "sling:resourceType": "core/cif/components/structure/page/v1/page",
       "cq:cifProductPage": "/content/product-page",
       "cq:cifCategoryPage": "/content/category-page",
       "jcr:language": "en_US",
@@ -13,6 +14,10 @@
             "selection": "MJ01",
             "sling:resourceType": "venia/components/commerce/productteaser"
           },
+          "productteaser-virtual": {
+            "selection": "VVP01",
+            "sling:resourceType": "venia/components/commerce/productteaser"
+          },
           "productteaser-variant": {
             "selection": "MJ01#MJ01-XS-Orange",
             "sling:resourceType": "venia/components/commerce/productteaser",
@@ -22,8 +27,12 @@
             "selection": "/var/commerce/products/catalog/luma/men/tops-men/jackets-men/MJ01",
             "sling:resourceType": "venia/components/commerce/productteaser"
           },
+          "productteaser-noclient": {
+            "selection": "MJ01",
+            "sling:resourceType": "venia/components/commerce/productteaser"
+          },
           "productcarousel": {
-            "product": ["NOT-FOUND", "24-MG01", "MJ01#MJ01-L-Red", "faultyproduct", "WJ01", "MJ01"],
+            "product": ["NOT-FOUND", "24-MG01", "MJ01#MJ01-L-Red", "faultyproduct", "/var/commerce/products/catalog/luma/men/tops-men/jackets-men/WJ01", "MJ01"],
             "sling:resourceType": "venia/components/commerce/productcarousel"
           },
           "product": {
@@ -91,11 +100,36 @@
                 "categoryId": "7",
                 "asset": "invalid-asset"
               },
-              "item3": {}
+              "item3": {},
+              "item4": {
+                "categoryId": "9999"
+              }
             }
           },
           "featuredcategorylist2": {
             "sling:resourceType": "venia/components/commerce/featuredcategorylist"
+          },
+          "featuredcategorylist3": {
+            "sling:resourceType": "venia/components/commerce/featuredcategorylist",
+            "items": {
+              "item0": {
+                "categoryId": "5"
+              }
+            }
+          },
+          "featuredcategorylist4": {
+            "sling:resourceType": "venia/components/commerce/featuredcategorylist",
+            "items": {
+              "item0": {
+                "categoryId": "5"
+              },
+              "item1": {
+                "categoryId": "a"
+              },
+              "item2": {
+                "categoryId": "7"
+              }
+            }
           }
         }
       }
@@ -128,6 +162,14 @@
     }
   },
   "pageF": {
+    "jcr:primaryType": "cq:Page",
+    "jcr:content": {
+      "jcr:primaryType": "cq:PageContent",
+      "magentoStore": "my-store",
+      "cq:magentoStore": "old-store"
+    }
+  },
+  "pageG": {
     "jcr:primaryType": "cq:Page",
     "jcr:content": {
       "jcr:primaryType": "cq:PageContent",

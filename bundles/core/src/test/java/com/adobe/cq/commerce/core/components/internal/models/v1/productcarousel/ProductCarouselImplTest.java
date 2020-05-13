@@ -19,7 +19,9 @@ import java.util.Arrays;
 import java.util.Currency;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.scripting.SlingBindings;
@@ -30,13 +32,17 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import com.adobe.cq.commerce.core.components.internal.services.MockUrlProviderConfiguration;
+import com.adobe.cq.commerce.core.components.internal.services.UrlProviderImpl;
 import com.adobe.cq.commerce.core.components.models.common.ProductListItem;
+import com.adobe.cq.commerce.core.components.services.UrlProvider;
 import com.adobe.cq.commerce.core.components.testing.Utils;
 import com.adobe.cq.commerce.core.components.utils.SiteNavigation;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.magento.graphql.ConfigurableProduct;
 import com.adobe.cq.commerce.magento.graphql.ConfigurableVariant;
 import com.adobe.cq.commerce.magento.graphql.Money;
+import com.adobe.cq.commerce.magento.graphql.ProductImage;
 import com.adobe.cq.commerce.magento.graphql.ProductInterface;
 import com.adobe.cq.commerce.magento.graphql.Query;
 import com.day.cq.wcm.api.Page;
@@ -54,6 +60,10 @@ public class ProductCarouselImplTest {
             (AemContextCallback) context -> {
                 // Load page structure
                 context.load().json(contentPath, "/content");
+
+                UrlProviderImpl urlProvider = new UrlProviderImpl();
+                urlProvider.activate(new MockUrlProviderConfiguration());
+                context.registerService(UrlProvider.class, urlProvider);
             },
             ResourceResolverType.JCR_MOCK);
     }
@@ -96,7 +106,11 @@ public class ProductCarouselImplTest {
         List<ProductListItem> items = productCarousel.getProducts();
         Assert.assertEquals(4, items.size()); // one product is not found and the JSON response contains a "faulty" product
 
-        List<String> productSkuList = Arrays.asList(productSkuArray);
+        List<String> productSkuList = Arrays.asList(productSkuArray)
+            .stream()
+            .map(s -> s.startsWith("/") ? StringUtils.substringAfterLast(s, "/") : s)
+            .collect(Collectors.toList());
+
         NumberFormat priceFormatter = NumberFormat.getCurrencyInstance(Locale.US);
 
         int idx = 0;
@@ -128,7 +142,13 @@ public class ProductCarouselImplTest {
             priceFormatter.setCurrency(Currency.getInstance(amount.getCurrency().toString()));
             Assert.assertEquals(priceFormatter.format(amount.getValue()), item.getFormattedPrice());
 
-            Assert.assertEquals(productOrVariant.getThumbnail().getUrl(), item.getImageURL());
+            ProductImage thumbnail = productOrVariant.getThumbnail();
+            if (thumbnail == null) {
+                // if thumbnail is missing for a product in GraphQL response then thumbnail is null for the related item
+                Assert.assertNull(item.getImageURL());
+            } else {
+                Assert.assertEquals(thumbnail.getUrl(), item.getImageURL());
+            }
             idx++;
         }
     }

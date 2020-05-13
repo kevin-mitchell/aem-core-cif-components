@@ -64,9 +64,15 @@ public interface Product {
 
     Boolean isConfigurable();
 
+    Boolean isGroupedProduct();
+
+    Boolean isVirtualProduct();
+
     String getVariantsJson();
 
     List<Variant> getVariants();
+
+    List<GroupItem> getGroupedProductItems();
 
     List<Asset> getAssets();
 

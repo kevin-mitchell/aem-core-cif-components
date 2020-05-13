@@ -14,6 +14,8 @@
 import React from 'react';
 import { Form } from 'informed';
 import { shape, string, func } from 'prop-types';
+import { useTranslation } from 'react-i18next';
+
 import Field from '../Field';
 import TextInput from '../TextInput';
 import Checkbox from '../Checkbox';
@@ -29,12 +31,16 @@ import {
 import mergeClasses from '../../utils/mergeClasses';
 import defaultClasses from './createAccount.css';
 import useCreateAccount from './useCreateAccount';
-
-const LEAD = 'Check out faster, use multiple addresses, track orders and more by creating an account!';
+import LoadingIndicator from '../LoadingIndicator';
 
 const CreateAccount = props => {
     const { showMyAccount } = props;
-    const [{ createAccountError, isSignedIn, isCreatingCustomer }, { createAccount }] = useCreateAccount();
+    const [{ createAccountError, isSignedIn, inProgress }, { createAccount }] = useCreateAccount();
+    const [t] = useTranslation('account');
+
+    if (inProgress) {
+        return <LoadingIndicator message="Creating account" />;
+    }
 
     const handleCreateAccount = formValues => {
         createAccount(formValues);
@@ -50,8 +56,13 @@ const CreateAccount = props => {
 
     return (
         <Form className={classes.root} onSubmit={handleCreateAccount}>
-            <p className={classes.lead}>{LEAD}</p>
-            <Field label="First Name" required={true}>
+            <p className={classes.lead}>
+                {t(
+                    'account:create-account-lead',
+                    'Check out faster, use multiple addresses, track orders and more by creating an account!'
+                )}
+            </p>
+            <Field label={t('account:firstname', 'First Name')} required={true}>
                 <TextInput
                     field="customer.firstname"
                     autoComplete="given-name"
@@ -60,7 +71,7 @@ const CreateAccount = props => {
                     aria-label="firstname"
                 />
             </Field>
-            <Field label="Last Name" required={true}>
+            <Field label={t('account:lastname', 'Last Name')} required={true}>
                 <TextInput
                     field="customer.lastname"
                     autoComplete="family-name"
@@ -69,7 +80,7 @@ const CreateAccount = props => {
                     aria-label="lastname"
                 />
             </Field>
-            <Field label="Email" required={true}>
+            <Field label={t('account:email', 'E-Mail')} required={true}>
                 <TextInput
                     field="customer.email"
                     autoComplete="email"
@@ -78,7 +89,7 @@ const CreateAccount = props => {
                     aria-label="email"
                 />
             </Field>
-            <Field label="Password" required={true}>
+            <Field label={t('account:password', 'Password')} required={true}>
                 <TextInput
                     field="password"
                     type="password"
@@ -88,7 +99,7 @@ const CreateAccount = props => {
                     aria-label="password"
                 />
             </Field>
-            <Field label="Confirm Password" required={true}>
+            <Field label={t('account:confirm-password', 'Confirm Password')} required={true}>
                 <TextInput
                     field="confirm"
                     type="password"
@@ -98,12 +109,16 @@ const CreateAccount = props => {
                 />
             </Field>
             <div className={classes.subscribe}>
-                <Checkbox field="subscribe" label="Subscribe to news and updates" aria-label="subscribe" />
+                <Checkbox
+                    field="subscribe"
+                    label={t('account:subscribe-news', 'Subscribe to news and updates')}
+                    aria-label="subscribe"
+                />
             </div>
             <div className={classes.error}>{errorMessage}</div>
             <div className={classes.actions}>
-                <Button disabled={isCreatingCustomer} type="submit" priority="high" aria-label="submit">
-                    {'Submit'}
+                <Button disabled={inProgress} type="submit" priority="high" aria-label="submit">
+                    {t('account:create-submit', 'Submit')}
                 </Button>
             </div>
         </Form>

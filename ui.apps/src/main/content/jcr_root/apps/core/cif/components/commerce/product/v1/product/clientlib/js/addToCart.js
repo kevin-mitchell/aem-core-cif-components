@@ -22,17 +22,29 @@ class AddToCart {
 
         // Get configuration from product reference
         let configurable = config.product.dataset.configurable !== undefined;
+        let virtual = config.product.dataset.virtual !== undefined;
+        let grouped = config.product.dataset.grouped !== undefined;
         let sku = !configurable ? config.product.querySelector(AddToCart.selectors.sku).innerHTML : null;
 
         this._state = {
-            sku: sku,
+            sku,
             attributes: {},
-            configurable: configurable
+            configurable,
+            virtual,
+            grouped
         };
 
         // Disable add to cart if configurable product and no variant was selected
         if (this._state.configurable && !this._state.sku) {
             this._element.disabled = true;
+        }
+
+        if (grouped) {
+            this._onQuantityChanged(); // init
+            // Disable/enable add to cart based on the selected quantities of a grouped product
+            document.querySelectorAll(AddToCart.selectors.quantity).forEach(selection => {
+                selection.addEventListener('change', this._onQuantityChanged.bind(this));
+            });
         }
 
         // Listen to variant updates on product
@@ -54,21 +66,46 @@ class AddToCart {
             return;
         }
 
+        // Update sku attribute in select element
+        document.querySelector(AddToCart.selectors.quantity).setAttribute('data-product-sku', variant.sku);
+
         // Update internal state
         this._state.sku = variant.sku;
         this._state.attributes = event.detail.attributes;
         this._element.disabled = false;
     }
 
+    _onQuantityChanged() {
+        const selections = Array.from(document.querySelectorAll(AddToCart.selectors.quantity));
+        let item = selections.find(selection => {
+            return parseInt(selection.value) > 0;
+        });
+        this._element.disabled = item == null;
+    }
+
     /**
      * Click event handler for add to cart button.
      */
     _onAddToCart() {
-        const quantity = document.querySelector(AddToCart.selectors.quantity).value;
+        // To support grouped products where multiple products can be put in the cart in one single click,
+        // the sku of each product is now read from the 'data-product-sku' attribute of each select element
 
-        if (this._state.sku && window.CIF) {
+        const selections = Array.from(document.querySelectorAll(AddToCart.selectors.quantity));
+        let items = selections
+            .filter(selection => {
+                return parseInt(selection.value) > 0;
+            })
+            .map(selection => {
+                return {
+                    sku: selection.dataset.productSku,
+                    virtual: this._state.grouped ? selection.dataset.virtual !== undefined : this._state.virtual,
+                    quantity: selection.value
+                };
+            });
+
+        if (items.length > 0 && window.CIF) {
             const customEvent = new CustomEvent(AddToCart.events.addToCart, {
-                detail: { sku: this._state.sku, quantity }
+                detail: items
             });
             document.dispatchEvent(customEvent);
         }

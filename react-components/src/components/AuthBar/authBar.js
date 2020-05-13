@@ -11,7 +11,8 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import Button from '../Button';
 import classes from './authBar.css';
@@ -21,8 +22,14 @@ import { func } from 'prop-types';
 
 const AuthBar = props => {
     const { showSignIn, showMyAccount } = props;
+    const [{ currentUser, isSignedIn }, { getUserDetails }] = useUserContext();
 
-    const [{ currentUser, isSignedIn }] = useUserContext();
+    useEffect(() => {
+        if (isSignedIn && currentUser.email === '') {
+            getUserDetails();
+        }
+    }, [getUserDetails]);
+    const [t] = useTranslation('account');
 
     const disabled = false;
 
@@ -30,10 +37,10 @@ const AuthBar = props => {
         <UserChip currentUser={currentUser} showMyAccount={showMyAccount} />
     ) : (
         <Button disabled={!!disabled} priority="high" onClick={showSignIn}>
-            {'Sign In'}
+            {t('account:sign-in', 'Sign In')}
         </Button>
     );
-    return <div className={classes.root}>{content} </div>;
+    return <div className={classes.root}>{content}</div>;
 };
 
 AuthBar.propTypes = {

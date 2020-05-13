@@ -38,13 +38,13 @@ The latest version of the AEM CIF Core Components, require the below minimum sys
 
 | CIF Core Components | AEM 6.4 | AEM 6.5 | Magento                    | Java |
 | ------------------- | ------- | ------- | -------------------------- | ---- |
-| 0.9.0               | 6.4.4.0 | 6.5.0   | 2.3.4                      | 1.8  |
+| 0.10.0              | 6.4.4.0 | 6.5.0   | 2.3.4                      | 1.8  |
 
 For a list of requirements for previous versions, see [Historical System Requirements](VERSIONS.md).
 
 ### AEM Commerce connector for Magento
 
-This project uses the [AEM Commerce connector for Magento](https://github.com/adobe/commerce-cif-connector) to improve the authoring experience by leveraging the product pickers, product assets view and consoles provided by the connector package.
+This project uses the [AEM Commerce connector for Magento](https://github.com/adobe/commerce-cif-connector) to improve the authoring experience by leveraging the product pickers, product assets view and consoles provided by the connector package. The AEM Commerce connector must be installed separately as part of the customer project.
 
 ### AEM Sites Core Components
 

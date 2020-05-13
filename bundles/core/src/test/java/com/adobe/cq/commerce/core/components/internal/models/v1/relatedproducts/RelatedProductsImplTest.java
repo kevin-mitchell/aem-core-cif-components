@@ -35,8 +35,11 @@ import org.mockito.internal.util.reflection.Whitebox;
 
 import com.adobe.cq.commerce.core.components.client.MagentoGraphqlClient;
 import com.adobe.cq.commerce.core.components.internal.models.v1.relatedproducts.RelatedProductsRetriever.RelationType;
+import com.adobe.cq.commerce.core.components.internal.services.MockUrlProviderConfiguration;
+import com.adobe.cq.commerce.core.components.internal.services.UrlProviderImpl;
 import com.adobe.cq.commerce.core.components.models.common.ProductListItem;
 import com.adobe.cq.commerce.core.components.models.retriever.AbstractProductsRetriever;
+import com.adobe.cq.commerce.core.components.services.UrlProvider;
 import com.adobe.cq.commerce.core.components.testing.Utils;
 import com.adobe.cq.commerce.core.components.utils.SiteNavigation;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
@@ -61,6 +64,10 @@ public class RelatedProductsImplTest {
             (AemContextCallback) context -> {
                 // Load page structure
                 context.load().json(contentPath, "/content");
+
+                UrlProviderImpl urlProvider = new UrlProviderImpl();
+                urlProvider.activate(new MockUrlProviderConfiguration());
+                context.registerService(UrlProvider.class, urlProvider);
             },
             ResourceResolverType.JCR_MOCK);
     }
@@ -99,11 +106,13 @@ public class RelatedProductsImplTest {
             requestPathInfo.setSelectorString("endurance-watch");
         }
 
-        Query rootQuery = Utils.getQueryFromResource(jsonResponsePath);
-        ProductInterface product = rootQuery.getProducts().getItems().get(0);
-        products = PRODUCTS_GETTER.get(relationType).apply(product);
-
-        GraphqlClient graphqlClient = Utils.setupGraphqlClientWithHttpResponseFrom(jsonResponsePath);
+        GraphqlClient graphqlClient = null;
+        if (jsonResponsePath != null) {
+            Query rootQuery = Utils.getQueryFromResource(jsonResponsePath);
+            ProductInterface product = rootQuery.getProducts().getItems().get(0);
+            products = PRODUCTS_GETTER.get(relationType).apply(product);
+            graphqlClient = Utils.setupGraphqlClientWithHttpResponseFrom(jsonResponsePath);
+        }
         Mockito.when(relatedProductsResource.adaptTo(GraphqlClient.class)).thenReturn(graphqlClient);
 
         // This sets the page attribute injected in the models with @Inject or @ScriptVariable
@@ -142,6 +151,12 @@ public class RelatedProductsImplTest {
     @Test
     public void testIsNotConfigured() throws Exception {
         setUp(RelationType.CROSS_SELL_PRODUCTS, "graphql/magento-graphql-crosssellproducts-result.json", false);
+        Assert.assertTrue(relatedProducts.getProducts().isEmpty());
+    }
+
+    @Test
+    public void testNoGraphqlClient() throws Exception {
+        setUp(RelationType.UPSELL_PRODUCTS, null, true);
         Assert.assertTrue(relatedProducts.getProducts().isEmpty());
     }
 

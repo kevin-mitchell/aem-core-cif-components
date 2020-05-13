@@ -21,13 +21,18 @@ import java.util.Map;
 
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.SyntheticResource;
+import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
+import org.apache.sling.caconfig.ConfigurationBuilder;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.internal.util.reflection.Whitebox;
 
+import com.adobe.cq.commerce.core.components.internal.services.MockUrlProviderConfiguration;
+import com.adobe.cq.commerce.core.components.internal.services.UrlProviderImpl;
 import com.adobe.cq.commerce.core.components.models.navigation.Navigation;
 import com.adobe.cq.commerce.core.components.models.navigation.NavigationModel;
 import com.adobe.cq.commerce.magento.graphql.CategoryTree;
@@ -35,6 +40,7 @@ import com.adobe.cq.wcm.core.components.models.NavigationItem;
 import com.day.cq.wcm.api.Page;
 import com.day.cq.wcm.api.PageManager;
 import com.day.cq.wcm.api.designer.Style;
+import com.google.common.collect.ImmutableMap;
 
 import static com.adobe.cq.commerce.core.components.internal.models.v1.navigation.NavigationImpl.DEFAULT_STRUCTURE_DEPTH;
 import static com.adobe.cq.commerce.core.components.internal.models.v1.navigation.NavigationImpl.MAX_STRUCTURE_DEPTH;
@@ -67,11 +73,13 @@ public class NavigationImplTest {
         Page currentPage = mock(Page.class);
         pageManager = mock(PageManager.class);
         when(currentPage.getPageManager()).thenReturn(pageManager);
+        when(currentPage.getPath()).thenReturn("/content/currentPage");
         Resource currentPageContent = mock(Resource.class);
         Map<String, Object> currentPageProperties = new HashMap<>();
         currentPageProperties.put("cq:cifCategoryPage", CATEGORY_PAGE_PATH);
         Page categoryPage = mock(Page.class);
         when(categoryPage.getPath()).thenReturn(CATEGORY_PAGE_PATH);
+        when(currentPageContent.getPath()).thenReturn(CATEGORY_PAGE_PATH + "/jcr:content");
         when(pageManager.getPage(CATEGORY_PAGE_PATH)).thenReturn(categoryPage);
         when(currentPageContent.getValueMap()).thenReturn(new ValueMapDecorator(currentPageProperties));
         when(currentPage.getContentResource()).thenReturn(currentPageContent);
@@ -90,6 +98,11 @@ public class NavigationImplTest {
         Whitebox.setInternalState(navigation, "graphQLCategoryProvider", categoryProvider);
         categoryList = new ArrayList<>();
         when(categoryProvider.getChildCategories(any(), any())).thenReturn(categoryList);
+
+        // URL provider
+        UrlProviderImpl urlProvider = new UrlProviderImpl();
+        urlProvider.activate(new MockUrlProviderConfiguration());
+        Whitebox.setInternalState(navigation, "urlProvider", urlProvider);
 
         // current request
         request = mock(SlingHttpServletRequest.class);
@@ -170,7 +183,7 @@ public class NavigationImplTest {
     public void testNavigationCatalogRootDisabled() {
         String catalogTitle = "Catalog 1";
 
-        initCatalogPage(false, false);
+        initCatalogPage(false, false, false);
 
         NavigationItem catalogItem = mock(NavigationItem.class);
         when(catalogItem.getPath()).thenReturn(CATALOG_PAGE_PATH);
@@ -184,7 +197,7 @@ public class NavigationImplTest {
     public void testNavigationCategoriesDisabled() {
         String catalogTitle = "Catalog 1";
 
-        initCatalogPage(true, false);
+        initCatalogPage(true, false, false);
 
         NavigationItem catalogItem = mock(NavigationItem.class);
         when(catalogItem.getPath()).thenReturn(CATALOG_PAGE_PATH);
@@ -336,7 +349,7 @@ public class NavigationImplTest {
         Integer categoryId = 0;
         String categoryName = "Category 1";
 
-        initCatalogPage(true, true);
+        initCatalogPage(true, true, false);
 
         NavigationItem item = mock(NavigationItem.class);
         when(item.getPath()).thenReturn(CATALOG_PAGE_PATH);
@@ -368,7 +381,7 @@ public class NavigationImplTest {
         Integer categoryId = 0;
         String categoryName = "Category 1";
 
-        initCatalogPage(true, true);
+        initCatalogPage(true, true, true);
 
         NavigationItem item = mock(NavigationItem.class);
         when(item.getPath()).thenReturn(CATALOG_PAGE_PATH);
@@ -419,7 +432,7 @@ public class NavigationImplTest {
         Integer categoryId = 0;
         String categoryName = "Category 1";
 
-        initCatalogPage(true, true);
+        initCatalogPage(true, true, false);
 
         NavigationItem item = mock(NavigationItem.class);
         when(item.getPath()).thenReturn(CATALOG_PAGE_PATH);
@@ -488,7 +501,7 @@ public class NavigationImplTest {
         String pageTitle = "Page 1";
         String categoryTitle = "Category 1";
 
-        initCatalogPage(true, true);
+        initCatalogPage(true, true, false);
 
         NavigationItem pageItem = mock(NavigationItem.class);
         when(pageItem.getTitle()).thenReturn(pageTitle);
@@ -525,15 +538,30 @@ public class NavigationImplTest {
         Assert.assertEquals(navigation, navigationList.get(0));
     }
 
-    private void initCatalogPage(boolean catalogRoot, boolean showMainCategories) {
+    private void initCatalogPage(boolean catalogRoot, boolean showMainCategories, boolean useCaConfig) {
         Page catalogPage = mock(Page.class);
         Resource catalogPageContent = mock(Resource.class);
         when(catalogPageContent.isResourceType(RT_CATALOG_PAGE)).thenReturn(catalogRoot);
         Map<String, Object> catalogPageProperties = new HashMap<>();
         catalogPageProperties.put(PN_SHOW_MAIN_CATEGORIES, showMainCategories);
-        catalogPageProperties.put(PN_MAGENTO_ROOT_CATEGORY_ID, 4);
+
+        if (!useCaConfig) {
+            catalogPageProperties.put(PN_MAGENTO_ROOT_CATEGORY_ID, 4);
+        }
         when(catalogPageContent.getValueMap()).thenReturn(new ValueMapDecorator(catalogPageProperties));
         when(catalogPage.getContentResource()).thenReturn(catalogPageContent);
+        when(catalogPage.getPath()).thenReturn("/content/catalog");
+        when(catalogPageContent.getPath()).thenReturn("/content/catalog/jcr:content");
+        ResourceResolver mockResourceResolver = mock(ResourceResolver.class);
+        when(mockResourceResolver.getResource(any(String.class))).thenReturn(null);
+        when(catalogPageContent.getResourceResolver()).thenReturn(mockResourceResolver);
         when(pageManager.getPage(CATALOG_PAGE_PATH)).thenReturn(catalogPage);
+
+        ValueMap configProperties = new ValueMapDecorator(ImmutableMap.of(PN_MAGENTO_ROOT_CATEGORY_ID, 4));
+        ConfigurationBuilder mockConfigBuilder = mock(ConfigurationBuilder.class);
+        when(mockConfigBuilder.name(any(String.class))).thenReturn(mockConfigBuilder);
+        when(mockConfigBuilder.asValueMap()).thenReturn(configProperties);
+
+        when(catalogPage.adaptTo(ConfigurationBuilder.class)).thenReturn(mockConfigBuilder);
     }
 }

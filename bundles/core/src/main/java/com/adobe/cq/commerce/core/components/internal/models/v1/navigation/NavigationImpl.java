@@ -18,13 +18,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.caconfig.ConfigurationBuilder;
 import org.apache.sling.models.annotations.Model;
 import org.apache.sling.models.annotations.Via;
 import org.apache.sling.models.annotations.injectorspecific.ScriptVariable;
@@ -34,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.core.components.models.navigation.Navigation;
 import com.adobe.cq.commerce.core.components.models.navigation.NavigationItem;
+import com.adobe.cq.commerce.core.components.services.UrlProvider;
+import com.adobe.cq.commerce.core.components.services.UrlProvider.ParamsBuilder;
 import com.adobe.cq.commerce.core.components.utils.SiteNavigation;
 import com.adobe.cq.commerce.magento.graphql.CategoryTree;
 import com.day.cq.commons.inherit.HierarchyNodeInheritanceValueMap;
@@ -65,6 +70,9 @@ public class NavigationImpl implements Navigation {
 
     @Self
     private SlingHttpServletRequest request = null;
+
+    @Inject
+    private UrlProvider urlProvider;
 
     @ScriptVariable
     private ValueMap properties = null;
@@ -160,8 +168,16 @@ public class NavigationImpl implements Navigation {
             return;
         }
 
-        final InheritanceValueMap catalogPageProperties = new HierarchyNodeInheritanceValueMap(catalogPage.getContentResource());
-        Integer rootCategoryId = catalogPageProperties.getInherited(PN_MAGENTO_ROOT_CATEGORY_ID, Integer.class);
+        Integer rootCategoryId = readPageConfiguration(catalogPage, PN_MAGENTO_ROOT_CATEGORY_ID);
+        if (rootCategoryId == null) {
+            ConfigurationBuilder configBuilder = catalogPage.adaptTo(ConfigurationBuilder.class);
+
+            if (configBuilder != null) {
+                ValueMap properties = configBuilder.name("cloudconfigs/commerce").asValueMap();
+                rootCategoryId = properties.get(PN_MAGENTO_ROOT_CATEGORY_ID, Integer.class);
+            }
+        }
+
         if (rootCategoryId == null) {
             LOGGER.warn("Magento root category ID property (" + PN_MAGENTO_ROOT_CATEGORY_ID + ") not found");
             return;
@@ -176,12 +192,17 @@ public class NavigationImpl implements Navigation {
         children = children.stream().filter(c -> c != null && c.getName() != null).collect(Collectors.toList());
         children.sort(Comparator.comparing(CategoryTree::getPosition));
 
-        SiteNavigation siteNavigation = new SiteNavigation(request);
         for (CategoryTree child : children) {
-            String title = child.getName();
-            String url = siteNavigation.toPageUrl(categoryPage, child.getId().toString());
+            Map<String, String> params = new ParamsBuilder()
+                .id(child.getId().toString())
+                .urlKey(child.getUrlKey())
+                .urlPath(child.getUrlPath())
+                .map();
+
+            String url = urlProvider.toCategoryUrl(request, categoryPage, params);
             boolean active = request.getRequestURI().equals(url);
-            CategoryNavigationItem navigationItem = new CategoryNavigationItem(null, title, url, active, child, request, categoryPage);
+            CategoryNavigationItem navigationItem = new CategoryNavigationItem(null, child.getName(), url, active, child, request,
+                categoryPage);
             pages.add(navigationItem);
         }
     }
@@ -194,6 +215,11 @@ public class NavigationImpl implements Navigation {
     @Override
     public String getParentId() {
         return null;
+    }
+
+    private Integer readPageConfiguration(Page page, String propertyName) {
+        InheritanceValueMap properties = new HierarchyNodeInheritanceValueMap(page.getContentResource());
+        return properties.getInherited(propertyName, Integer.class);
     }
 
     class PageNavigationItem extends AbstractNavigationItem {
@@ -238,7 +264,7 @@ public class NavigationImpl implements Navigation {
         }
     }
 
-    static class CategoryNavigationItem extends AbstractNavigationItem implements NavigationItem {
+    class CategoryNavigationItem extends AbstractNavigationItem implements NavigationItem {
         private CategoryTree category;
         private SlingHttpServletRequest request;
         private Page categoryPage;
@@ -268,12 +294,16 @@ public class NavigationImpl implements Navigation {
 
             List<NavigationItem> pages = new ArrayList<>();
 
-            SiteNavigation siteNavigation = new SiteNavigation(request);
             for (CategoryTree child : children) {
-                String title = child.getName();
-                String url = siteNavigation.toPageUrl(categoryPage, child.getId().toString());
+                Map<String, String> params = new ParamsBuilder()
+                    .id(child.getId().toString())
+                    .urlKey(child.getUrlKey())
+                    .urlPath(child.getUrlPath())
+                    .map();
+
+                String url = urlProvider.toCategoryUrl(request, categoryPage, params);
                 boolean active = request.getRequestURI().equals(url);
-                pages.add(new CategoryNavigationItem(this, title, url, active, child, request, categoryPage));
+                pages.add(new CategoryNavigationItem(this, child.getName(), url, active, child, request, categoryPage));
             }
 
             return pages;
